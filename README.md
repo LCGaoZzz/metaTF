@@ -70,6 +70,23 @@ See the [full API and test instructions](docs/README.md),
 [plotting guide](docs/plotting.md), [semantic compatibility notes](docs/semantics.md),
 and [benchmark report](docs/benchmarks.md).
 
+## Omicos Agent/Skill integration
+
+A portable [Omicos bundle](agent-harness/omicos/README.md) provides the
+`metatf_analyst` Agent, the `metatf` Skill and a thin native-CLI launcher.
+It preserves scientific method options while bounding threads to the available
+CPU allocation. No additional workflow engine or algorithm implementation is added.
+
+```bash
+python agent-harness/install_omicos.py --destination /path/to/analysis-workspace
+# For a separate omicos-admin catalog PR:
+python agent-harness/install_omicos.py --destination /path/to/omicos-admin --layout catalog
+```
+
+The selected Python environment must already contain `metatf`. Copying the
+bundle does not install the package or deploy a production Omicos Agent.
+See the [harness overview](agent-harness/README.md) for tests and details.
+
 ## Verification
 
 The deliverable contains the official-derived fixtures and R reference CSVs.
