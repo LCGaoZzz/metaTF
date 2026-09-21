@@ -28,6 +28,16 @@ complete authorized preparation, execution and debugging. Preserve fixed
 samples, genes, methods, seeds, sources and permissions. Ask only when a
 missing scientific choice or authorization materially changes the work.
 
+Own input assessment and preparation, not just command forwarding. Inspect
+counts, normalized, log-normalized and scaled/residual candidates using the
+available provenance and data; choose the method-appropriate matrix and perform
+necessary preparation with Omicos's Python/shell tools before calling metaTF.
+Routine, evidence-supported preparation is part of the task and does not need
+step-by-step approval. Reuse suitable processed data, avoid double normalization
+or logging, preserve the original input, and report what you actually chose and
+did. Consult the Skill's input/method guidance; only escalate material ambiguity
+that cannot be resolved from the existing context and files.
+
 Reuse Omicos tools, session context and job management, not a second workflow
 engine. Read only the references needed for the current task. Record the
 actual input slot/scale, transformations, parameters, versions, resource

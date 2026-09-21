@@ -5,6 +5,19 @@ portable Agent/Skill layout as the iobrx integration. The runtime is a thin
 launcher for the installed `metatf` package, not a second implementation.
 There are no host-specific paths, tokens or additional runtime dependencies.
 
+## LLM-led input preparation
+
+The Agent/Skill instructs the LLM to inspect expression scale and available
+slots, select the method-appropriate data, perform necessary preparation with
+Omicos's existing Python/shell tools, and then run metaTF. Routine preparation
+does not require step-by-step user approval. Suitable processed data is reused;
+material unresolved ambiguity is surfaced instead of guessed away. See the
+[Skill](skills/metatf/SKILL.md) and its input/method references.
+
+This is guidance for the Agent, not a built-in classifier or normalizer in
+`run_metatf.py`. Direct CLI calls still use exactly the input supplied (native
+h5ad reads `X`); they do not gain the LLM's assessment/preparation behavior.
+
 ## Install into a workspace
 
 From a metaTF-py checkout:

@@ -15,6 +15,30 @@ current options; do not fabricate unsupported flags.
 | Activity | `gsva` | The implemented scope is GSVA's Poisson/RNA-seq path, not Gaussian, ssGSEA, PLAGE or z-score scoring. Select an appropriate nonnegative expression scale. |
 | Activity | `ulm` | Returns t-statistics **and raw p-values**; explicitly retain the chosen `subset` or `full_axis` semantics. |
 
+## Choose preparation for the method, not for the file suffix
+
+These are agent decision aids, not new API requirements or a compulsory
+preprocessing recipe. Preserve a specified reproduction protocol. Otherwise,
+reuse the task's appropriate existing expression representation and perform
+only the missing preparation; consult the installed implementation when needed.
+
+| Method | Input assessment and preparation guidance |
+|---|---|
+| `pcor` | No counts-only requirement. An appropriate existing normalized/log-expression matrix can be reused. Per-cell normalization can change across-cell gene ranks, so do not claim counts and log-normalized expression are universally interchangeable. Check constant rows and the upstream `rowSums > 0` filter rather than feeding centered residuals blindly. |
+| `puic` | Account for the API's optional `log_scale=True`, which performs `log2(x+1)`. Leave it false for already logged inputs; do not log externally and internally. Choose the intended scale before discretization. The native CLI has no `--log-scale` flag; use the API for that option. |
+| `genie3` | No counts-only requirement. Keep a suitable existing normalized/log-expression matrix, or prepare counts for the chosen analysis once. Transforming expression changes the inference problem; do not change the reproduction input merely because `mode="parity"` exists. |
+| `sincerities` | Preserve a justified expression scale consistently across time points and align the required sample/time metadata. Do not substitute pseudotime or invent collection times to complete preparation. |
+| `aucell` | Scores within-cell ranks: reuse an appropriate counts or normalized/log-expression matrix without needless renormalization. Keep the intended background gene universe; gene-wise scaling, imputation or an HVG-only input can change the ranking/background. |
+| `viper`, `ulm` | For routine scRNA activity, suitable existing normalized/log-expression data can be reused; this is not a counts-only interface. Preserve intentionally supplied signatures and model semantics rather than imposing a universal log step. For ULM `full_axis`, keep the intended full gene axis, not only network targets/HVGs. |
+| `gsva` | This implementation is Poisson-only. For ordinary RNA-seq use, seek genuine count-scale input rather than automatically passing lognorm or residuals. Prefer an available validated counts slot; do not round or invert lognorm to manufacture counts. If none exists and no justified protocol resolves the choice, explain the mismatch rather than silently switching kernels or methods. |
+
+For example, when `X` is known log-normalized, `layers["counts"]` contains
+counts, and the task is routine ULM activity, reuse suitable `X` without another
+normalization/log step. For Poisson GSVA on that same file, choose the counts
+slot and explicitly feed it via the API or a prepared file. If `X` is scaled
+but `raw.X` holds suitable log-expression, use `raw.X` with `raw.var_names`;
+`raw` does not mean counts. These examples guide reasoning, not slot priorities.
+
 ## Modes that must not be conflated
 
 GENIE3 `parity` uses the R-compatible single random stream; its thread argument
@@ -46,10 +70,14 @@ comparison; do not treat thousands of cells as thousands of independent mice.
 
 The launcher does not normalize data, select HVGs, infer species, choose a TF
 list, correct batches or convert a dense inferred GRN into a validated regulon.
-Perform requested preparation with the existing tools and record it explicitly.
+The Agent performs justified preparation with existing tools and records it;
+this is instructed LLM behavior, not an automatic feature of the launcher.
 Algorithm benchmarks/parity evidence belong to the source repository and have
 not been re-established by a portable-launcher smoke test.
 
 Reviewed implementation and semantic documentation:
 [api.py](https://github.com/LCGaoZzz/metaTF-py/blob/0ec381c9020cf62723b425ca0cf5f669d42801cf/src/metatf/api.py),
 [semantics.md](https://github.com/LCGaoZzz/metaTF-py/blob/0ec381c9020cf62723b425ca0cf5f669d42801cf/docs/semantics.md).
+
+PUIC transform anchor:
+[grn/puic.py](https://github.com/LCGaoZzz/metaTF-py/blob/ad33b1ced1308596adfad643b870aca10402c9ef/src/metatf/grn/puic.py).
