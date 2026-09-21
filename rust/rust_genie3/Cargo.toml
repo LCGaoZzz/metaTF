@@ -1,0 +1,14 @@
+[package]
+name = "rust_genie3"
+version = "0.1.0"
+edition = "2021"
+description = "Bit-level faithful Rust/PyO3 port of GENIE3 (1.24.0) BuildTreeEns C code incl. R 4.3 Mersenne-Twister RNG semantics; parity mode replicates the R single-core reference stream bit-for-bit"
+
+[lib]
+name = "rust_genie3"
+crate-type = ["cdylib", "rlib"]   # rlib added for the metatf_rust facade (round 5)
+
+[dependencies]
+pyo3 = { workspace = true }
+numpy = { workspace = true }
+rayon = { workspace = true }

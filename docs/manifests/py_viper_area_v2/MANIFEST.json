@@ -1,0 +1,38 @@
+{
+  "label": "py_viper_area_v2",
+  "method": "aREA full chain as executed inside viper::viper for the metaTF runViper() call — rewritten end-to-end from ISSUE-FACTS/r-intermediates.md §2 (installed viper package source, verified line by line)",
+  "impl_route": "pandas edge table (first-appearance TF order) -> eset.filter union mask -> per-regulon intersection + minsize -> per-regulon sufficient stats via bincount/fmax.at -> ONE CSR (filtered-genes x regulons) sparse matrix product per cell-chunk for sum1 and sum2; no python loop over regulons in the numeric path",
+  "memory_mode": "cell-chunked (default 256): peak O(chunk·n_filtered) quantile matrices + 2 sparse incidence matrices (nnz = surviving edges)",
+  "parity_mode": "semantic anchor ISSUE-FACTS/r-intermediates.md §2 (round3). Every step of the chain is transcribed verbatim: eset.filter union, rank/(n+1) plotting position with n = filtered rows, t1 branch kept with zero contribution under tfmode=+1, es 3-tail formula with sign(0)=1, nes = es·sqrt(Σ w_norm1²) with w_norm1 = likelihood/max(likelihood). Cross-validated against an independent naive loop transcribed from the same anchor (max diff 0.0 on synthetic data).",
+  "entry_point": "run_viper_area(exp: DataFrame genes x cells, net=DataFrame{tf,target,weight} | gene_list=dict, weighted=True, minsize=5, eset_filter=True, nes=True, cell_chunk=256, return_es=False) -> DataFrame regulons x cells",
+  "key_changes_vs_round2": [
+    "eset.filter: union-of-regulon filter (rows ∩ (TF names ∪ all target names)) replaces round2's variance>0 filter; the plotting-position n is now the FILTERED row count (real data: 809/1000 rows kept)",
+    "plotting position: qnorm(rank_asc/(n+1)) (anchor §2.5) replaces round2's (rank-0.5)/n; rank ascending, ties average",
+    "t1 two-tail branch added verbatim (|u-0.5|·2, per-cell (1-colMax)/2 shift, qnorm); coefficient (1-|mor|)=0 under tfmode=+1 so it contributes exactly 0 — stored as an explicit-zero sparse matrix so the formula is executed, not elided",
+    "NES scaling: es·sqrt(Σ w_norm1²) with w_norm1 = likelihood/max(likelihood) replaces round2's ES/(sqrt(Σl²)/Σl) — identical for unweighted regulons (mean·sqrt(m)), different for non-uniform likelihoods",
+    "es 3-tail formula (|sum1| + sum2·1[sum2>0])·sign(sum1), sign(0)=1 — collapses exactly onto sum1 under tfmode=+1 (verified to 1e-13 against hand computation)",
+    "duplicate (tf,target) edges KEPT as separate likelihood entries (R named-vector indexing semantics; round2 groupby-mean'd them — mm_blood_network has 131 duplicate pairs)",
+    "output order = first-appearance TF order (R preserves regulon input order); round2 sorted alphabetically",
+    "round2's ties/quantile debug parameters removed — the anchor pins average ties and rank/(n+1)"
+  ],
+  "semantics_implemented": [
+    "tfmode = +1 constant (metaTF runViper never maps weight sign into mode)",
+    "likelihood = network weight (weighted entry) or all-1 (unweighted character-regulon entry)",
+    "eset.filter=TRUE: expression rows filtered to TF names ∪ all target names of the regulon AS PASSED (before minsize drops)",
+    "per-regulon targets ∩ filtered rows; surviving size < minsize(5) → regulon dropped",
+    "aREA: w_norm1 = l/max(l), wts = w_norm1/Σw_norm1, t2 = qnorm(rank_asc_avg/(n+1)) with n = filtered rows",
+    "t1 = qnorm(|u-0.5|·2 + (1-colMax(|u-0.5|·2))/2) — zero contribution under mor=+1, formula preserved",
+    "es = (|sum1| + sum2·1[sum2>0])·sign(sum1), sign(0)=1",
+    "nes = es·sqrt(Σ w_norm1²)",
+    "no pleiotropy, no dnull, no adaptive size, nothing beyond anchor §2",
+    "output regulons x cells, cells = eset columns, regulon order = first appearance"
+  ],
+  "uncertainties": [
+    "FLOATING-POINT SUMMATION ORDER ONLY: the sparse matmul accumulates per-regulon weighted sums in a different order than R's per-regulon colSums (expected |Δ| ≲ 1e-15 relative); scipy norm.ppf vs R qnorm agree to ~1e-16 — same class",
+    "DUPLICATE-EDGE HAZARD (data-harness, not formula): the 131 duplicated (tf,target) pairs in mm_blood_network are kept as separate likelihood entries per R named-vector semantics; if the blind harness aggregated duplicates upstream of viper, regulons containing them would differ (Σw and ΣΣw² both change). Formula-level semantics are otherwise pinned by the anchor."
+  ],
+  "deps": ["numpy==2.2.6", "scipy==1.16.3", "pandas==2.3.3", "pyarrow==20.0.0 (IO only)"],
+  "build_cmd": "python smoke_test.py  (no build step; pure python)",
+  "tested_smoke": true,
+  "smoke_details": "16/16 checks PASS: vectorized == independent anchor-transcribed naive loop (max diff 0.0e0, weighted, ties present); es == Σ wts·t2q to 1e-13; unweighted nes == mean·sqrt(m) with n=36 filtered rows AND differs from the unfiltered-n reading; 25 non-union genes leave all NES unchanged; TF-name row enters the union (n 39→40); minsize error branch; unweighted == equal-weight net on identical unions; duplicate edges kept; real exp_smoke x mm_blood -> 874 regulons x 154 cells in 0.1 s, finite, eset.filter kept 809/1000 rows"
+}

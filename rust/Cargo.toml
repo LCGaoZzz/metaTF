@@ -1,0 +1,20 @@
+# metaTF campaign winners, assembled round 5.
+# Three verbatim winner crates (numeric code untouched; only crate-type gains
+# "rlib" so the metatf_rust facade can link them) + one facade cdylib that
+# exposes all three as submodules of a single extension module.
+[workspace]
+resolver = "2"
+members = ["rust_pcor_v2", "rust_puic", "rust_genie3", "metatf_rust"]
+
+[workspace.package]
+edition = "2021"
+
+[workspace.dependencies]
+# pins copied verbatim from the round-3/round-4 candidate Cargo.tomls
+pyo3 = { version = "=0.22.6", features = ["extension-module"] }
+numpy = "=0.22.1"
+rayon = "=1.10.0"
+
+[profile.release]
+opt-level = 3
+debug = false

@@ -1,0 +1,30 @@
+{
+  "label": "py_aucell_v2",
+  "method": "AUCell recovery-curve AUC (SCENIC), replicating AUCell_buildRankings + AUCell_calcAUC as called by metaTF runAUCell",
+  "impl_route": "identical to round2 (streaming per-cell scipy.stats.rankdata(-column,'average') descending ranks; concatenated-set reduceat scoring; never materializes the full G x C ranking matrix) — the ONLY change is the attendance boundary",
+  "memory_mode": "per-cell streaming: peak = one rank vector (n_genes) + output (|sets| x n_cells)",
+  "parity_mode": "anchor ISSUE-FACTS/r-intermediates.md §3: the discard rule is missingPercent >= 0.8 (equality DROPS); everything else round2 did is confirmed by the same anchor line (midrank average ties, aucMaxRank=ceil(0.05*G), staircase normAUC denominator)",
+  "entry_point": "run_aucell(exp: DataFrame genes x cells, gene_sets: dict, auc_max_rank=None, auc_max_rank_frac=0.05, norm_auc=True, missing_percent=0.8, ties='average') -> DataFrame sets x cells (compliant sets only)",
+  "diff_vs_round2": [
+    "SINGLE CHANGE: attendance rule strict '>' replaced by '>=' — sets with EXACTLY 80% missing genes are now dropped (round2 kept them). On the real smoke inputs the sets sitting exactly at 0.8 are Tfap2d and Zfp445, precisely the two the anchor records R dropping.",
+    "the all-dropped error now also fires when every set is at exactly 0.8 (previously such sets were computed)",
+    "docstrings updated to state the >= boundary; no other line of numeric semantics touched"
+  ],
+  "semantics_implemented": [
+    "per-cell gene ranking, highest expression = rank 1, ties = average (midrank) — confirmed anchor §3",
+    "aucMaxRank default ceil(0.05 * n_genes) — confirmed anchor §3",
+    "AUC = sum over set genes within top T of (T - rank + 1) (recovery-curve staircase area)",
+    "normAUC=TRUE: AUC / maxAUC, maxAUC = m*T - m*(m-1)/2 (staircase maximum) — confirmed anchor §3",
+    "attendance rule: gene set dropped when missing-gene fraction >= 0.8 (equality drops; anchor §3)",
+    "all sets dropped -> ValueError",
+    "weights in gene sets ignored (metaTF strips weights before AUCell)",
+    "output sets x cells, only compliant sets retained, set order preserved"
+  ],
+  "uncertainties": [
+    "arithmetic is exact-integer valued before the normAUC division ((T - midrank + 1) terms are dyadic rationals; reduceat order vs R's cumulative sum cannot differ beyond 1 ulp after division) — nothing semantic remains; the round2 normalization-denominator and tie-policy uncertainties are resolved as CONFIRMED by anchor §3"
+  ],
+  "deps": ["numpy==2.2.6", "scipy==1.16.3", "pandas==2.3.3", "pyarrow==20.0.0 (IO only)"],
+  "build_cmd": "python smoke_test.py  (no build step; pure python)",
+  "tested_smoke": true,
+  "smoke_details": "13/13 checks PASS: hand-computed staircase AUCs (S1=1.0, S2=1/9, tie gene contributing 0, raw 9); independent loop agreement 0.0 on 200 random tied-integer cells; >=0.8 boundary drops B80 and keeps B60; only-set-at-0.8 raises ValueError; all-dropped raises; real exp_smoke + mm_blood sets -> 20x154 finite, real boundary sets at exactly 0.8 identified as Tfap2d and Zfp445 (matching anchor §3 verbatim) and Tfap2d confirmed dropped in the real run"
+}

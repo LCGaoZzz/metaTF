@@ -1,0 +1,75 @@
+NOTICE — metatf-py (metatf 0.1.0 / metatf-rust 0.1.0)
+=====================================================
+
+This deliverable reimplements parts of the metaTF R package and its
+dependencies. Provenance of every ported component:
+
+1. metaTF (R), version 0.1.1
+   - Upstream: the metaTF repository vendored in this campaign at `repo/`
+     (see `repo/DESCRIPTION`; License: MIT + file LICENSE, authors
+     Guangjue Tang, Puwen Tan).
+   - Ported elements (formula-level, from the R sources):
+     inferWeightExpMat gene-filter and dispatch semantics, dfToList,
+     runViper / runAUCell / runGSVA call contracts, PUIC.R algorithm,
+     SINCERITIES integration contract. No R source code is included in
+     this package.
+   - Test inputs derived from `repo/inst/extdata` (test_exp_data,
+     test_col_data, mm_blood_network) and the campaign's R round-1
+     reference outputs (see tests/data and tests/conftest.py headers).
+
+2. GENIE3, version 1.24.0 (Bioconductor)
+   - License: GPL (>= 2). Authors: Van Anh Huynh-Thu, Sara Aibar,
+     Pierre Geurts.
+   - `rust/rust_genie3` is a Rust/PyO3 port of the GENIE3 C engine
+     (`src/GENIE3.c` BuildTreeEns) including R 4.3 Mersenne-Twister RNG
+     semantics, transcribed from the official Bioconductor source tarball
+     (GENIE3_1.24.0.tar.gz, RELEASE_3_18, commit cc5a692) preserved by the
+     campaign at `candidates/round4/rust_genie3/upstream_c/` and
+     `upstream_pkg/`. The tarball is NOT redistributed inside this
+     deliverable; the port's parity evidence (bit-level vs the R reference)
+     is in `docs/manifests/rust_genie3/MANIFEST.json`.
+
+3. GSVA, version 1.50.5 (Bioconductor)
+   - License: GPL (>= 2). Authors: Robert Castelo, Justin Guinney et al.
+   - `src/metatf/scorers/gsva.py` is a NumPy port of the GSVA kernel and
+     KS-walk (method="gsva", kcdf="Poisson"): `compute.gene.density`
+     (Poisson kernel, `src/kernel_estimation.c`, bw = 0.5) and
+     `ks_matrix_R` (`src/ks_test.c`), transcribed from the official source
+     tarball (GSVA_1.50.5.tar.gz) preserved by the campaign at
+     `candidates/round4/py_gsva/upstream_c/`. Not redistributed here;
+     parity evidence in `docs/manifests/py_gsva/MANIFEST.json`.
+
+4. PUIC — in-repo origin
+   - `rust/rust_puic` is a port of `repo/R/PUIC.R` (the metaTF package's
+     own PUIC implementation, MIT as per repo/DESCRIPTION). Provenance and
+     divergence notes (constant-gene permissiveness, uniform_frequency
+     branch not ported) in `docs/manifests/rust_puic/MANIFEST.json`.
+
+5. viper (aREA), AUCell, ppcor
+   - `src/metatf/scorers/viper_area.py` (aREA chain as executed by
+     viper::viper for metaTF's runViper call), `src/metatf/scorers/aucell.py`
+     (AUCell_buildRankings/calcAUC semantics), and the ppcor::pcor formula
+     (cov-of-ranks + MASS::ginv tolerance) were transcribed from the
+     installed R package sources during the campaign, anchored in
+     ISSUE-FACTS/r-intermediates.md; evidence in the corresponding
+     docs/manifests/*/MANIFEST.json. No upstream code is included.
+
+6. SINCERITIES
+   - `src/metatf/grn/sincerities.py` ports the SINCERITIES algorithm
+     (Gao et al., ETH Zurich; R implementation by Ziyi Hua, integrated
+     upstream by Puwen Tan) as found in `repo/R/SINCERITIES_GRNs.R`,
+     with glmnet's default elastic-net lambda path reimplemented
+     (glmnet itself is NOT used and not required). Disclosed solver-path
+     and unseeded-cvFolds caveats: docs/semantics.md §7.
+
+7. decoupler (scverse), v1.9.2 formula / v2.2.0 implementation
+   - ULM `subset` follows the decoupler v1.9.2 documented ULM formula;
+     `full_axis` transcribes decoupler v2.2.0 `mt/_ulm.py` + `pp/net.py`
+     arithmetic. External anchor values (closure to decoupler 2.2.0
+     run_ulm) in docs/manifests/py_ulm_dual/MANIFEST.json. No upstream
+     code is included.
+
+Licence of this deliverable's own code: MIT (matches upstream metaTF).
+Third-party port provenance is listed above; users redistributing binaries
+of the GENIE3/GSVA-derived ports must comply with GPL (>= 2) for those
+components.

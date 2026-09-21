@@ -1,0 +1,31 @@
+{
+  "label": "py_ulm_dual",
+  "method": "ULM (univariate linear model) TF activity with DUAL semantics: subset (round2/py_ulm = decoupler v1.9.2 documented formula) and full_axis (decoupler v2.2.0 formula)",
+  "impl_route": "subset path = round2/py_ulm/ulm.py copied verbatim (sparse CSR moment-sum Pearson on matched target subset, df = n_targets - 2, den>0 guard t=0/p=1, cell-chunked); full_axis path = dense zero-padded W (n_genes x n_tf) built from the same prepared (deduped, min_target_num-filtered) edges, then decoupler v2.2.0 arithmetic transcribed verbatim (_cov/_cor/_tval: grand-mean centering b.mean() scalar, ddof=1 stds, r = cov/ssd, t = r*sqrt(df/((1-r+2.2e-16)(1+r+2.2e-16)))), df = n_genes - 2, NO guard (sd=0 -> 0/0 -> NaN as in decoupler); output TF x cells both modes",
+  "parity_mode": "subset: bit-identical to round2/py_ulm (verified on synthetic and real exp_smoke x mm_blood); full_axis: formula-exact vs decoupler v2.2.0 mt/_ulm.py transcription (verified element-wise against independent recompute on synthetic + 5/5 random real (TF,cell) spot checks)",
+  "entry_point": "run_ulm(exp: DataFrame genes x cells, net: DataFrame tf/target/weight, min_target_num=5, cell_chunk=256(subset only), eps=2.2e-16, semantics='subset'|'full_axis') -> (activity TF x cells, pval TF x cells); run_ulm_full_axis(exp, net, min_target_num=5) exposed directly",
+  "semantics_implemented": [
+    "SUBSET (semantics='subset', default): r = Pearson(weights, target expression) over the TF's MATCHED target genes only; df = n_targets - 2; t = r*sqrt(df/((1-r+eps)(1+r+eps))); p = 2*t.sf(|t|, df); constant-weight/zero-expression guard returns t=0, p=1; anchors: decoupler v1.9.2 docs (ulm-sem-1) + _ulm.py formula (ulm-impl-1)",
+    "FULL_AXIS (semantics='full_axis'): W zero-padded to the FULL gene axis of exp (decoupler pp/net.py _order: madjmat = zeros((len(features), n_src))); r computed over ALL n_genes rows with decoupler 2.2.0 _cov/_cor (b = exp matrix as n_var x n_obs; grand-mean scalar centering; ddof=1); df = n_genes - 2 ('fitting {n_src} univariate models of {n_var} observations (targets) with {df} degrees of freedom'); p = t.sf(|t|, df)*2",
+    "full_axis NaN policy: NO den>0 guard - full-axis constant weight columns (only possible for all-zero matched weights) and constant-expression cells yield 0/0 = NaN, exactly as decoupler 2.2.0; subset mode keeps the round2 guard (t=0, p=1) - the definitional behavioral difference between the two modes on constant-weight TFs (mm_blood: 304/1117 TFs constant-weight -> subset 0/1, full_axis DEFINED via zero-padding)",
+    "shared metaTF conventions in both modes: min_target_num=5 counted on matched unique targets after gene intersection; duplicate (tf,target) edges averaged; weight==0 edges dropped; TF x cells output orientation; sorted TF row order",
+    "full_axis memory: dense (n_genes x n_tf) adj + (n_cells x n_genes) intermediates; no chunking by default (chunking would change the grand-mean centering floating-point path vs decoupler's whole-matrix call)"
+  ],
+  "uncertainties": [
+    "DUPLICATE-EDGE CONVENTION: decoupler 2.2.0 _validate_net ASSERTS no duplicate (source,target) rows (no aggregation); our metaTF-side prepare averages duplicates (round2 convention). For nets with duplicates our full_axis numbers correspond to the averaged net, which decoupler 2.2.0 would reject outright; mm_blood has no duplicates after groupby (round2 verified the raw file has none).",
+    "ZERO-WEIGHT EDGES: decoupler 2.2.0 keeps explicit zero weights (pivot keeps 0; a TF with only-zero matched weights stays in the matrix -> constant column -> NaN). We DROP weight==0 edges in _prepare_net (round2 convention), so the NaN case can only arise through bypassing prepare; documented behavior difference on all-zero-weight TFs.",
+    "TMIN COUNTING: decoupler 2.2.0 prune counts matched targets per source BEFORE any weight consideration; identical to our min_target_num on matched unique targets (weights dropped are absent by convention above).",
+    "GRAND-MAN CENTERING: decoupler 2.2.0 _cov subtracts b.mean() (scalar over the whole matrix) - algebraically equal to per-column centering for the Pearson numerator, numerically a different floating-point path; we transcribe it verbatim, so our full_axis bits follow decoupler 2.2.0's, not a textbook re-centered formula.",
+    "SUBSET GUARD vs R/decoupler: round2's guard (t=0,p=1 on undefined r) is a metaTF-side convention; decoupler emits NaN there. Kept for bit-identity with round2 in subset mode.",
+    "P-VALUE TAIL: full_axis uses stats.t.sf(|t|, df)*2 with scalar df broadcast; matches decoupler's sts.t.sf(abs(t), df)*2."
+  ],
+  "upstream_audit": [
+    "upstream/decoupler-v2.2.0_src_decoupler_mt__ulm.py: verbatim v2.2.0 source (3863 B) - _cov/_cor/_tval/_func_ulm, df = n_var - 2, epsilon 2.2e-16, log line text",
+    "upstream/decoupler-v2.2.0_src_decoupler_pp_net.py: verbatim v2.2.0 source (11187 B) - prune/_adj/_order/_validate_net/adjmat (zero-padded full-feature adjacency, tmin on matched targets, duplicates asserted, zero weights kept)",
+    "ISSUE-FACTS/literature-anchors.md anchors ulm-sem-1 (v1.9.2 run_ulm docs), ulm-impl-1 (mt/_ulm.py formula, df = n_targets - 2), ulm-api-1 (v1.9.2 = last run_ulm-named version; new API dc.mt.ulm)"
+  ],
+  "deps": ["python 3.11.15 (kernel venv)", "numpy 2.2.6", "scipy 1.16.3", "pandas 2.3.3", "pyarrow (parquet IO)"],
+  "build_cmd": "no build step; smoke: python smoke_test.py",
+  "tested_smoke": true,
+  "smoke_details": "19/19 PASS: subset bit-identical to round2 py_ulm on synthetic (DataFrame equality incl. index/cols) AND real exp_smoke(1000x154) x mm_blood (874 TFs x 154 cells); full_axis matches decoupler-formula independent recompute for all 3 TFs (rtol 1e-12); constant-weight TF: subset t=0/p=1 vs full_axis DEFINED; 0/0 -> NaN demonstrated for full-axis constant column; subset p uses df=n_targets-2, full_axis p uses df=n_genes-2 (both verified against t.sf); min_target_num filtering identical in both modes; duplicate (tf,target) averaging in full_axis; real data: 5/5 random (TF,cell) full_axis values match direct recompute; subset-mode guarded entries 25584/134596 vs full_axis finite everywhere."
+}

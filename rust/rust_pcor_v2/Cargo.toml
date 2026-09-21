@@ -1,0 +1,14 @@
+[package]
+name = "rust_pcor_v2"
+version = "0.2.0"
+edition = "2021"
+description = "Spearman partial correlation via covariance-of-ranks + ginv-tolerance eigen truncation (ppcor::pcor parity, anchor r-intermediates.md S1), PyO3 extension"
+
+[lib]
+name = "rust_pcor_v2"
+crate-type = ["cdylib", "rlib"]   # rlib added for the metatf_rust facade (round 5)
+
+[dependencies]
+pyo3 = { workspace = true }
+numpy = { workspace = true }
+rayon = { workspace = true }

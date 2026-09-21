@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "metatf-rust"
+version = "0.1.0"
+description = "Rust accelerators for metatf (pcor partial correlation, PUIC, GENIE3) - optional, install after metatf"
+requires-python = ">=3.10"
+
+[tool.maturin]
+# single aggregate extension (cargo workspace above); python-source gives us a
+# package dir so we control __init__ (importlib loader: immune to stale
+# sys.modules entries - the round-2 NameError bug class).
+python-source = "python"
+manifest-path = "metatf_rust/Cargo.toml"
+module-name = "metatf_rust"

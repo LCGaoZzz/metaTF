@@ -1,0 +1,48 @@
+[build-system]
+# metatf is PURE PYTHON: `pip install -e .` needs no Rust toolchain.
+# The Rust accelerators live in a separate wheel (`metatf-rust`) built from
+# ./rust with maturin — see docs/BUILD.md and ./build.sh.
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metatf"
+version = "0.1.0"
+description = "metaTF GRN inference and regulon activity, reimplemented in Python/Rust (no R runtime required)"
+readme = "docs/README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "metaTF upgrade campaign (round 5 assembly)" }]
+keywords = ["GRN", "regulon", "scRNA-seq", "viper", "AUCell", "GSVA", "GENIE3", "PUIC", "SINCERITIES"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+numba = ["numba>=0.60"]          # required for metatf.grn.sincerities (10x+ faster; module falls back to pure python without it)
+anndata = ["anndata", "pyarrow"] # h5ad input support
+parquet = ["pyarrow"]            # parquet IO support
+plot = ["matplotlib>=3.7"]       # heatmap, reduced-dimension, expression and Radviz plots
+test = ["pytest>=7", "pyarrow"]
+
+[project.scripts]
+metatf = "metatf.cli:main"
+
+[project.urls]
+Upstream = "https://github.com/wanglabsmu/metaTF"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: quick parity/contract tests (target < 60 s total)",
+    "slow: full-reference parity tests (minutes)",
+]
+addopts = "-ra"

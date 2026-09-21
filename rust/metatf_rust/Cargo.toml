@@ -1,0 +1,17 @@
+[package]
+name = "metatf_rust"
+version = "0.1.0"
+edition = "2021"
+description = "Aggregate PyO3 facade: rust_pcor_v2 + rust_puic + rust_genie3 as submodules of one extension module (metatf-rust wheel)"
+
+[lib]
+name = "metatf_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+numpy = { workspace = true }
+rayon = { workspace = true }
+rust_pcor_v2 = { path = "../rust_pcor_v2" }
+rust_puic = { path = "../rust_puic" }
+rust_genie3 = { path = "../rust_genie3" }

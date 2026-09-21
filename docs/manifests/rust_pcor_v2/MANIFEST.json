@@ -1,0 +1,34 @@
+{
+  "label": "rust_pcor_v2",
+  "method": "Spearman partial-correlation matrix, ppcor::pcor(t(exp), method='spearman')$estimate parity, as a PyO3 extension — semantics transcribed verbatim from ISSUE-FACTS/r-intermediates.md §1",
+  "impl_route": "Rust: hand-rolled midrank (average ties) -> CENTERED rank matrix Y (per-gene rank variances KEPT — covariance, not correlation) -> cyclic-Jacobi symmetric eigendecomposition on the DUAL Gram C=YᵀY when cells<=genes (rank(cov)<=cells-1 makes this exact and O(G·C²) instead of O(G³)); direct Jacobi on S=YYᵀ when genes<cells -> STRICT ginv-tolerance truncation λ > sqrt(.Machine$double.eps)·λmax (MASS::ginv `Xsv$d > tol*Xsv$d[1]`; symmetric PSD singular values = eigenvalues) -> Θ=pinv=W Wᵀ -> p_ij=-Θ_ij/sqrt(Θ_ii Θ_jj), diag 1; rayon row-block parallelism",
+  "memory_mode": "input G x C + W (G x r, r<=min(G,C)-1) + output G x G (inherent to the method, same as upstream); the covariance matrix itself is never materialized on the dual path; real 1000x154 output 8 MB, <0.1 s",
+  "parity_mode": "numpy same-path reference (scipy.stats.rankdata 'average' -> np.cov(ddof=1) -> np.linalg.pinv(rcond=1.4901161193847656e-8) -> -cov2cor, diag 1) matched on three regimes AND the full real 1000x1000 output of exp_smoke",
+  "entry_point": "rust_pcor_v2.partial_corr_spearman(mat: C-contiguous f64 genes x cells ndarray, n_threads=None, tol_rel=None) -> genes x genes ndarray",
+  "key_changes_vs_round2": [
+    "THE §1 FIX: pseudo-inverse of the COVARIANCE matrix of the ranks, not the correlation matrix. round2 unit-normalized each rank row (correlation) before inverting; R inverts cov(x, method='spearman') with per-gene rank variances kept. The two paths coincide only when every gene has the same rank variance (no ties); on tie-heavy data (all real scRNA inputs — zeros) they diverge materially: 2.4e-03 max |Δpcor| on the synthetic tie regime, same class on exp_smoke. v2 centers rank rows and keeps their scale.",
+    "tolerance rule literal: keep λ STRICTLY > tol·λmax with tol = 1.4901161193847656e-8 = sqrt(.Machine$double.eps), replicating MASS::ginv's `Xsv$d > tol * Xsv$d[1]` relative-to-largest-singular-value semantics on the symmetric-PSD eigenvalue spectrum; no numerical-rank estimation (anchor §1 numerical warning honored)",
+    "the 1/(n-1) divisor of R's cov() is omitted by design: a positive scalar scales all eigenvalues uniformly, leaves the RELATIVE truncation invariant, and cancels inside cov2cor — final partial correlations identical (invariance argument, not an approximation)",
+    "IMPORT BUG FIXED: round2's installed wheel used maturin's auto-generated package __init__.py (`from .x import *` + bare `x.__doc__`), which binds the submodule name only via an import side effect and raises NameError('rust_pcor') when the shared kernel's sys.modules holds a stale rust_pcor.rust_pcor entry (reproduced live in this kernel). v2 ships its own python/rust_pcor_v2/__init__.py that loads the extension via importlib.import_module and takes attributes off the returned module — no bare names, no side-effect dependence; verified in a fresh subprocess AND under the exact stale-state scenario that broke round2"
+  ],
+  "semantics_implemented": [
+    "Spearman ranks, average ties (midrank), per gene across cells — anchor §1 step 1",
+    "covariance of the rank vectors (rank variances kept) — anchor §1 step 1",
+    "MASS::ginv semantics: strict λ > tol·λmax relative cutoff on the symmetric-PSD spectrum (singular values = eigenvalues) — anchor §1 step 2, ginv branch (this data is always rank-deficient: 1000 genes over 154 cells -> rank <= 153)",
+    "pcor = -cov2cor(Θ): p_ij = -Θ_ij/sqrt(Θ_ii·Θ_jj), diagonal forced to 1 — anchor §1 step 3",
+    "thread-count control (rayon local pool per call); bit-identical across thread counts (output rows computed independently)",
+    "explicit ValueError branches: n_cells<3; constant (zero-rank-variance) rows"
+  ],
+  "uncertainties": [
+    "Jacobi eigendecomposition vs R's La.svd/LAPACK: same mathematics for symmetric PSD, different floating-point rounding — measured <=3.6e-15 vs the numpy LAPACK-SVD reference on every regime and 1.4e-14 on the real 1000x154 full matrix (bound asked: 1e-8)",
+    "det(cvx) < eps branch selection not replicated: v2 ALWAYS takes the ginv branch. For this data det < eps is guaranteed (rank <= 153 < 1000); for a well-conditioned full-rank matrix ginv-with-tol keeps the whole spectrum and equals solve() to floating-point noise — the only divergence class would be an ill-conditioned full-rank matrix near the tol boundary (not reachable from metaTF inputs)",
+    "equality-at-threshold: MASS uses strict > (an eigenvalue exactly equal to tol·λmax is dropped); the anchor's prose says λ < tol·λmax is zeroed. Measure-zero in floating point; strict > (the literal MASS comparison) implemented",
+    "rank-deficient regime (G >> C) yields |p_ij| = 1 for gene pairs with collinear precision rows — a genuine property of pinv-based partial correlation at rank C-1; R's ppcor hits the same via ginv",
+    "constant rows raise ValueError instead of R's NA propagation; metaTF's exp_cutoff=rowSums>0 removes such rows upstream",
+    "ppcor's p-value/p-statistic columns not computed (metaTF takes only $estimate)"
+  ],
+  "deps": ["pyo3==0.22.6", "rust-numpy(numpy crate)==0.22.1", "rayon==1.10.0", "maturin==1.15.0 (pip; invoked as `python -m maturin`)", "toolchain: cargo/rustc 1.88.0 (/root/.cargo/bin)"],
+  "build_cmd": "bash build.sh   # maturin build --release -i $(sys.executable) -o dist && pip install --force-reinstall --no-deps dist/rust_pcor_v2-*.whl && two import regression checks",
+  "tested_smoke": true,
+  "smoke_details": "15/15 checks PASS: full-rank 40x200 (direct path) 1.97e-15; rank-deficient 300x40 (dual path) 3.50e-15; tie-heavy integer 200x50 3.61e-15 AND cov-path != cor-path divergence 2.43e-03 demonstrated (round2 bug class); real exp_smoke 1000x154 full 1000x1000 output 1.39e-14 vs numpy cov-path reference, <0.1 s, symmetric, diag 1; fresh-subprocess import clean; stale-sys.modules re-import (the exact round2 NameError scenario) OK; n_threads=1 vs 8 bit-identical; error branches. Wheel: dist/rust_pcor_v2-0.2.0-cp311-cp311-manylinux_2_34_x86_64.whl installed into the kernel venv."
+}

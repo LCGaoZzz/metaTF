@@ -1,0 +1,14 @@
+[package]
+name = "rust_puic"
+version = "0.1.0"
+edition = "2021"
+description = "PUIC (partial information decomposition + context) GRN inference, PyO3 port of repo/R/PUIC.R (numerical parity target)"
+
+[lib]
+name = "rust_puic"
+crate-type = ["cdylib", "rlib"]   # rlib added for the metatf_rust facade (round 5)
+
+[dependencies]
+pyo3 = { workspace = true }
+numpy = { workspace = true }
+rayon = { workspace = true }

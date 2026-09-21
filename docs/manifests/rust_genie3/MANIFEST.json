@@ -1,0 +1,128 @@
+{
+  "candidate": "rust_genie3",
+  "round": 4,
+  "version": "0.1.0",
+  "built": "2026-09-20",
+  "wheel": "dist/rust_genie3-0.1.0-cp311-cp311-manylinux_2_34_x86_64.whl",
+  "build": {
+    "paradigm": "round3 rust_pcor_v2 (python-source __init__ via importlib; maturin -i sys.executable; PATH=/root/.cargo/bin)",
+    "python": "/root/.omicos/env/.venv/bin/python3 (cp311 kernel venv)",
+    "pins": { "pyo3": "=0.22.6", "numpy": "=0.22.1", "rayon": "=1.10.0" },
+    "cargo_test": "2 passed (RNG reference + x87 sum basics)"
+  },
+  "upstream": {
+    "package": "GENIE3 1.24.0 (Bioconductor 3.18; installed R lib version matches)",
+    "source_tarball": "https://bioconductor.org/packages/3.18/bioc/src/contrib/GENIE3_1.24.0.tar.gz",
+    "note": "CRAN 404s (GENIE3 lives on Bioconductor); the version suggested in the task brief (1.24.0) is archived there. Local installed R GENIE3 == 1.24.0, so the port targets the exact binary the campaign's R reference will run.",
+    "c_files": ["upstream_c/GENIE3.c", "upstream_c/GENIE3.R", "upstream_c/DESCRIPTION"],
+    "r_version_rng_reference": "R 4.3.3 installed locally (runif ground truth), RNG.c from R-4-3-branch (wch/r-source mirror)"
+  },
+  "c_to_rust_map": [
+    { "c": "GENIE3.c:1848 BuildTreeEns", "rust": "genie3.rs Core::build (param init, identity ls/weights, maxnodes=nbterms*(2*nbobj-1), ensemble, re-sort attribute_vector, importance)", "notes": "object_mapping is identity in GENIE3 and never mutated -> dropped; node_weight/node_size/prediction tables write-only in this configuration -> dropped (documented no-ops)" },
+    { "c": "GENIE3.c:283 build_one_tree", "rust": "genie3.rs Core::build_one_tree", "notes": "stack order preserved: left pushed first, right on top (right processed next); empty children become leaves via nodesize<min_node_size short-circuit exactly like C; stop-condition short-circuit order (nodesize==1 || nodesize<1 || stop_splitting) preserved so v_tot is only set when C sets it" },
+    { "c": "GENIE3.c:367 separate_ls_vector_local", "rust": "genie3.rs separate_ls (free fn over x/n)", "notes": "two-pointer partition on check_test(val<thr); returns start+1 iff ls[start] passes; used for both build (on cls) and importance (on ts_vector)" },
+    { "c": "GENIE3.c:407 quicksort_ls_vector (Numerical-Recipes, M_QS=7)", "rust": "genie3.rs Core::quicksort_ls_vector", "notes": "verbatim: insertion sort with VAL<=a break, median-of-3 with the three swaps, do-while scan loops, ir-i+1>=j-l stack order, and the C early-return when jstack>50 (leaves segment partially sorted - bug-compatible). istack sized 52 vs C's 50: C writes istack[50] OOB in the unreachable jstack==50 corner; Rust cannot UB there, reachable behaviour identical" },
+    { "c": "GENIE3.c:491 check_test", "rust": "inlined as `val < threshold` at separate_ls", "notes": "GENIE3 uses numerical attributes only (attribute_descriptors all 0)" },
+    { "c": "GENIE3.c:507 find_the_best_split / 534 find_a_split_at_random_et / 580 find_the_best_split_among_k", "rust": "genie3.rs Core::find_the_best_split_among_k / find_a_split_at_random_et", "notes": "RF path: one get_random_integer per loop iteration; swap selected attribute to position remaining_att-1; attribute_vector permutation PERSISTS across nodes and trees (C never resets inside BuildTreeEns); ET path: do-while with nb_try decrement on score<0 and threshold 10.0" },
+    { "c": "GENIE3.c:617 get_random_integer / 625 get_random_float", "rust": "rng.rs get_random_integer / get_random_float", "notes": "R-package variant: rn = unif_rand()*RAND_MAX(2147483647); floor(rn*max_val*1.0/(RAND_MAX+1.0)); float variant casts to f32" },
+    { "c": "GENIE3.c:636 getattval", "rust": "genie3.rs Core::getattval (x[att*n+obj])", "notes": "core_table att-major f32 == c(x) column-major layout of exprMatrixT[, regs]" },
+    { "c": "GENIE3.c:903 make_ls_vector_bagging / 896 identity", "rust": "genie3.rs Core::make_ls_vector_bagging / make_ls_vector_identity", "notes": "bagging consumes exactly n draws; weights zeroed then +1.0 per draw; ls keeps objects with weight!=0 in id order" },
+    { "c": "GENIE3.c:982 build_one_tree_ensemble", "rust": "genie3.rs Core::build_one_tree_ensemble", "notes": "CRITICAL stream detail: make_ls_vector(-1) BEFORE tree 0 and once per tree AFTER building (loop body order: build -> make_ls_vector -> store), so n_trees+1 bootstrap vectors are drawn; the final one is discarded but advances the stream for the NEXT target gene's .C call" },
+    { "c": "GENIE3.c:1230 summarize_vector_multiregr", "rust": "genie3.rs Core::summarize_vector_multiregr", "notes": "accumulation `w*y*y` == (w*y)*y in f64 (left-assoc, y promoted once)" },
+    { "c": "GENIE3.c:1256 compute_multiregr_score_from_table", "rust": "genie3.rs Core::compute_multiregr_score_from_table", "notes": "op order: t2[0] then per-goal t2[2i+1], t2[2i+2], y/n var with fabs, info=v_tot-(y+n), return info/v_tot (v_tot global set by stop_splitting at this node)" },
+    { "c": "GENIE3.c:1284 stop_splitting_criterio_multiregr", "rust": "genie3.rs Core::stop_splitting_criterio_multiregr", "notes": "sets v_tot WITHOUT fabs; leaf iff (v_tot/t0[0])<=0.0" },
+    { "c": "GENIE3.c:1295 not_significant_test_multiregr", "rust": "inlined: `!(best_threshold_score >= 0.0)` in build_one_tree", "notes": "NaN-safe in the same direction as C (NaN>=0 false -> leaf)" },
+    { "c": "GENIE3.c:1326 find_the_best_threshold_multiregr", "rust": "genie3.rs Core::find_the_best_threshold_multiregr", "notes": "MIXED PRECISION SITE: `tsm[1][2] += w*(y*y)` with y*y rounded in f32 FIRST; threshold midpoint `(float)((old+new as f32)/2.0)` then `if old>=bt: bt=new`; strict > for score improvement; best_score>=0.0 gate at the end" },
+    { "c": "GENIE3.c:1487 find_a_threshold_at_random_multiregr (ET)", "rust": "genie3.rs Core::find_a_threshold_at_random_multiregr", "notes": "one get_random_float when min!=max; threshold = max-(max-min)*rf in f32; accumulation here is `w*y*y` == (w*y)*y f64 (site A, differs from the RF threshold scan!)" },
+    { "c": "GENIE3.c:1567 compute_multiregr_score_from_table_for_varimp", "rust": "genie3.rs Core::compute_multiregr_score_from_table_for_varimp", "notes": "per-goal v_tot computed inside the loop; vi = v_tot-(fabs+fabs)" },
+    { "c": "GENIE3.c:1589 get_vi_multiregr_separate", "rust": "genie3.rs Core::get_vi_multiregr_separate", "notes": "MIXED PRECISION SITE: `tsm[..][2] += y*y` with the product rounded in f32, then promoted; weights are ++ (+=1.0); empty-side guard (start>=borne || borne>end) -> vi=0" },
+    { "c": "GENIE3.c:1636 compute_one_tree_variable_importance_multiregr_separate", "rust": "genie3.rs Core::compute_one_tree_variable_importance", "notes": "obj=-1 path; children pushed only when non-empty (start<borne, borne<=end); left then right (right processed next); nodesize==1 or leaf -> pop" },
+    { "c": "GENIE3.c:1714 compute_ltrees_variable_importance_multiregr_separate", "rust": "genie3.rs Core::compute_ltrees_variable_importance", "notes": "ts_vector=identity; attribute_position identity (attribute_vector was re-sorted by BuildTreeEns before this call); sum_weight=n_trees; final /=sum_weight" },
+    { "c": "GENIE3.c:1781 set_tree_param / 1817 set_ensemble_param", "rust": "EnsParams { n_trees, rf_k, et, bootstrap, min_node_size=1 }", "notes": "compile-time configuration instead of function pointers; savepred=0, varmin=0.0" },
+    { "c": "R/GENIE3.R .GENIE3 (nCores==1 branch)", "rust": "lib.rs genie3_targets + python/__init__.py run_genie3", "notes": "per-target setdiff(regulatorNames, targetName) preserving order (R setdiff dedups, first occurrence kept); mtry=.setMtry per target; weight matrix rows=regulatorNames input order; im/sum(im) column normalization" },
+    { "c": "R/GENIE3.R .setMtry", "rust": "genie3.rs set_mtry", "notes": "K numeric -> K; 'sqrt' -> round(sqrt(p)) (R round, NOT floor - this fixes a semantic error carried in round3 py_genie3 which used floor); else p" }
+  ],
+  "rng": {
+    "target": "R 4.3 default RNGkind: Mersenne-Twister via unif_rand(), as consumed by GENIE3.c after set.seed()",
+    "set_seed_path": [
+      "do_set.seed -> RNG_Init(MERSENNE_TWISTER, seed)",
+      "50x initial scrambling: seed = 69069*seed + 1 (Int32 wraparound)",
+      "n_seed=625: 625 further LCG steps fill i_seed[0..624]",
+      "FixupSeeds(MT, initial=1): mti = i_seed[0] = 624",
+      "mt[i] = i_seed[i+1]  (mt == dummy+1)",
+      "NOTE: MT_sgenrand() exists in RNG.c but is NOT on the set.seed path - the state is the raw LCG stream. A first implementation that used MT_sgenrand (scrambled or not) failed the R reference values; the i_seed path matches bit-exactly."
+    ],
+    "unif_rand": "fixup(MT_genrand()); MT_genrand = tempered y * 2^-32 (literal 2.3283064365386963e-10); fixup replaces x<=0 with 0.5*i2_32m1 and (1-x)<=0 with 1-0.5*i2_32m1 (literal 2.328306437080797e-10)",
+    "consumption_order": [
+      "per target (= per .C BuildTreeEns call): bootstrap0 (n draws) -> per tree t: one get_random_integer per find_the_best_split_among_k iteration (i.e. mtry per split node, fewer only when the attribute pool empties) -> bootstrap(t+1) (n draws) drawn AFTER building tree t",
+      "the bootstrap after the LAST tree is drawn and discarded (C loop calls make_ls_vector(current_tree) unconditionally) but advances the stream for the next target",
+      "ET: no bootstrap (identity ls); draws only in find_a_split_at_random_et (one randint + one randfloat per non-constant attribute evaluation)"
+    ],
+    "norm_rand": "not needed - GENIE3.c uses unif_rand() only",
+    "validation": {
+      "method": "bit-exact equality with installed R 4.3.3 runif after set.seed",
+      "seeds": [1, 123, 42, 7],
+      "crosses_624_boundary": true,
+      "also_encoded_in": ["cargo test rng::tests::r_reference_runif", "python mt_selfcheck()"]
+    }
+  },
+  "float_semantics": {
+    "storage": "X and Y stored f32 exactly as R's as.single at the .C boundary (f64->f32 round-to-nearest, applied per value in the Python wrapper via a single ascontiguousarray(..., dtype=float32))",
+    "accumulators": "SCORE_TYPE=double; all table_score_multiregr arithmetic in f64",
+    "mixed_sites": [
+      "summarize_vector_multiregr & find_a_threshold_at_random_multiregr: (w*y)*y - pure f64",
+      "find_the_best_threshold_multiregr: w*(y*y) - y*y FIRST rounded in f32 then f64 multiply",
+      "get_vi_multiregr_separate: y*y in f32 promoted by the += (counts incremented as +=1.0)",
+      "threshold midpoint: float add -> double /2.0 -> round to f32 -> old_val>=bt check in f32",
+      "ET random threshold: max-(max-min)*get_random_float() entirely in f32"
+    ],
+    "x87_assumption": "C compiled with default x86-64 SSE2 semantics (FLT_EVAL_METHOD=0): float+float computes in float. All f32 arithmetic above assumes this; the R package .so is built the same way",
+    "wrapper_normalization": "im <- im/sum(im): R sum() accumulates doubles in long double (x87 80-bit) sequentially; emulated exactly in rng.rs X87 (exponent diff <=64 handled exactly in u128, diff >=65 provably rounds away with no tie possible; final round to f64 = one further RNE at 53 bits, like an x87 store). Reached regime (importance magnitudes) exact; f64-subnormal far-tail (e < -1021 intermediate rounding during the final powi-based scale) not perfectly emulated - unreachable for variance-reduction sums"
+  },
+  "modes": {
+    "parity": {
+      "threads": "always 1 (n_threads accepted and ignored - verified by smoke [3a])",
+      "stream": "ONE RMersenneTwister seeded via the set.seed path, shared sequentially across targets in targetNames order - replicates R's global RNG state across successive .C calls",
+      "claim": "bit-level replica of R GENIE3 1.24.0 single-core execution from set.seed(seed) onward, subject to the assumptions in float_semantics"
+    },
+    "fast": {
+      "default": true,
+      "parallelism": "rayon across targets; each target's forest is independent",
+      "stream": "per-target RMersenneTwister seeded with the high 32 bits of SplitMix64(master_seed mixed with ordinal+1) fed through the SAME set.seed initialization path",
+      "deviation_nature": "identical algorithm and identical per-target computation given the draws; ONLY the bootstrap/attribute-subset draw sequences differ from parity (independent streams instead of one shared sequential stream). Deterministic and thread-count-invariant. Verified: corr(fast(seed=1), parity(seed=1)) == corr(parity(seed=2), parity(seed=1)) within noise (0.747 vs 0.741 at 100 trees) - fast behaves exactly like the same algorithm on an independent stream"
+    }
+  },
+  "entry_semantics": {
+    "orientation": "exp = genes x samples (rows genes); internally transposed to samples x genes f32",
+    "regulators": "None -> all genes; names (validated, order preserved) or 1-based integer positions (R semantics)",
+    "per_target": "setdiff(regulatorNames, targetName) - order preserved, dedup, self removed (self-loop weight 0)",
+    "mtry": ".setMtry: round(sqrt(p)) / p / K",
+    "n_trees": "default 1000 (R default); nmin=1; bootstrap (RF); IncNodePurity importance; double normalization (C: /sum_tree_weights, wrapper: /sum(im) with long-double sum)",
+    "exp_cutoff": "infer_weight_exp_mat_genie3 replicates inferWeightExpMat: =0 keeps rowSums>0 rows; (0,1) and >=1 branches as in round3 py_genie3",
+    "degenerate": "constant-y target -> importance all 0 -> 0/0 = NaN column (same as R); 0 regulators for a target (RF) -> zero column, 2n stream draws consumed (matches R running the C on empty input); 0 regulators in ET refused (C would be UB)"
+  },
+  "smoke": {
+    "ran": "python smoke_test.py - ALL PASSED",
+    "layers": [
+      "[1] MT RNG bit-exact vs R 4.3.3 runif (seeds 1/123/42)",
+      "[2] Rust parity == independent Python transliteration of GENIE3.c, bit-exact, 20 targets x 19 regs x 5 trees (both implementations written from the C source; catches porting slips)",
+      "[3a] parity twice-run bit-identical; n_threads=8 does not change parity; non-degenerate columns sum to 1; self-loops 0",
+      "[3b] fast deterministic + thread-invariant; stream-noise equivalence vs parity documented above",
+      "[3c] fast single-target == Python transliteration seeded with the same SplitMix64-derived seed, bit-exact",
+      "[4] wrapper semantics: mtry round vs floor distinguishes p=3; setdiff order; exp_cutoff rowSums>0; constant-y NaN column; ET path runs; infer_weight_exp_mat end-to-end"
+    ],
+    "no_R_GENIE3_reference_used": "per task constraints (runs/ untouched; no GENIE3 result compared against R output). RNG-level validation against installed R behavior is the explicitly permitted exception ('或用已安装 R 的行为验证')",
+    "benchmarks": {
+      "parity_20t_199r_300s_1000trees": "12.8s (0.64 s/target)",
+      "fast_same_8threads": "1.9s (0.09 s/target)",
+      "fast_all_200_targets_8threads": "16.1s"
+    }
+  },
+  "uncertainties": [
+    "Bit-level parity vs the R binary rests on (a) FLT_EVAL_METHOD=0 for the C build (SSE2 default), (b) glibc RAND_MAX=2147483647, (c) R sum() long-double accumulation as emulated. All three hold for the local R 4.3.3 / gcc toolchain; the campaign's reference must run on the same class of platform.",
+    "R GENIE3's foreach path (nCores>1) uses doRNG - NOT replicated (out of scope; campaign reference is single-core c1).",
+    "ET path ported and structurally validated but not bit-checked against a second transliteration in smoke; RF is the campaign path.",
+    "save_ensemble_ls tables (never read by the importance computation) are not materialized - zero effect on RNG or numerics.",
+    "node_weight/node_size/prediction arrays are write-only in this configuration - dropped with no behavioural effect."
+  ]
+}
