@@ -1,4 +1,4 @@
-# Benchmarks: metatf implementations vs R baselines
+# Benchmarks: metaTF-py implementations vs R baselines
 
 All numbers are measured by the campaign's blind benchmark harnesses
 (`runs/round2`, `runs/round3`, `runs/round4` `experiment_results.json`;

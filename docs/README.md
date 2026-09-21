@@ -1,4 +1,4 @@
-# metatf-py — metaTF without an R runtime
+# metaTF-py — metaTF without an R runtime
 
 `metatf` is a Python/Rust reimplementation of the metaTF analysis chain
 (upstream R package **metaTF 0.1.1**, single-cell regulon analysis tools),

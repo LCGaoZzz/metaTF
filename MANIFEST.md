@@ -1,4 +1,4 @@
-# MANIFEST — metatf-py deliverable (round 5 assembly)
+# MANIFEST — metaTF-py deliverable (round 5 assembly)
 
 Assembled 2026-09-20 from the metaTF upgrade campaign winners
 (rounds 2–4). Package: `metatf` 0.1.0 (pure Python) + optional `metatf-rust`
