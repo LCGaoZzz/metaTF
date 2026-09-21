@@ -22,6 +22,25 @@ selection rule. Establish species, identifiers, expression scale and matrix
 orientation from provenance rather than filenames. Preserve user-fixed
 methods, seeds, genes, cells/samples and ULM/GENIE3 semantics.
 
+## Assess and prepare inputs yourself
+
+You are responsible for assessing and preparing data before execution; the
+launcher does not do this for you. Use Omicos's existing Python/shell tools to
+inspect the file, relevant AnnData slots, metadata and useful numeric summaries.
+Infer whether the candidate is counts, non-log normalized, log-normalized or
+scaled/residual expression, then select and prepare it for the requested method.
+Use the input and method references below for concrete guidance; do not apply
+one counts-first or normalize-and-log recipe to every method.
+
+Reuse a suitable processed matrix as-is. When transformation or slot selection
+is warranted, perform it on a working copy and continue without asking for
+approval of routine steps. Distinguish supported inference from recorded
+provenance, avoid duplicate transformations, and preserve user-fixed scientific
+choices. Resolve uncertainty from existing files/context first; ask only when
+remaining ambiguity would materially alter the analysis. Record the chosen
+slot, scale/evidence and actual transformations in the existing job/notebook
+or result summary. No new detector, mandatory stage or report format is needed.
+
 ## Portable entrypoint
 
 Resolve `scripts/run_metatf.py` using
@@ -47,6 +66,6 @@ mandatory notebook or production catalog deployment is implied by this bundle.
 
 ## References on demand
 
-- [Inputs and outputs](references/inputs-and-outputs.md): explicit AnnData slots, metadata alignment, network shape and result inspection.
-- [Methods and interpretation](references/methods.md): the eight methods, ULM/GENIE3 modes and important statistical boundaries.
+- [Inputs and outputs](references/inputs-and-outputs.md): LLM-led scale assessment/preparation, explicit AnnData slots, metadata alignment and results.
+- [Methods and interpretation](references/methods.md): method-specific input choices, the eight methods, ULM/GENIE3 modes and statistical boundaries.
 - [Runtime](references/runtime.md): installation, CPU allocation, diagnostics and custom Python API calls.
